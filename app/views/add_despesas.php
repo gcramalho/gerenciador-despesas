@@ -4,39 +4,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adicionar Despesa</title>
+    <title>Adicionar Despesa - Gerenciador de Despesas</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body>
+<body class="add-page">
 
-    <h1>Adicionar Nova Despesa</h1>
+      <!-- Barra de navegação -->
+      <?php include '../app/views/partials/navbar.php'; ?>
 
-    <form id="formAddDespesa" action="index.php?acao=add_despesas" method="post">
+    <div class="container- mt-5">
 
-        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token'] ?? ''; ?>">
+        <h1 class="text-center mb-4">Adicionar Nova Despesa</h1>
 
-        <label for="tipo">Tipo:</label>
-        <input type="text" name="tipo" id="tipo" value="<?= htmlspecialchars($_POST['tipo'] ?? '')?>">>
-        <br>
+        <!-- Formulário Adicionar Despesa -->
+        <form id="formAddDespesa" action="index.php?acao=add_despesas" method="post" class="add-form">
 
-        <label for="quantidade">Quantidade:</label>
-        <input type="number" name="quantidade" id="quantidade" value="<?= htmlspecialchars($_POST['quantidade'] ?? '')?>">
-        <br>
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token'] ?? ''; ?>">
 
-        <label for="valor">Valor:</label>
-        <input type="text" name="valor" id="valor" value="<?= htmlspecialchars($_POST['valor'] ?? '')?>">> 
-        <br>
+            <!-- Campo Tipo -->
+            <div class="form-group mb-3">
+                <label for="tipo" class="form-label">Tipo:</label>
+                <input type="text" name="tipo" id="tipo" class="form-control" value="<?= htmlspecialchars($_POST['tipo'] ?? '')?>" required>
+            </div>
+            
+            <!-- Campo Quantidade -->
+            <div class="form-group mb-3">
+                <label for="quantidade" class="form-label">Quantidade:</label>
+                <input type="number" name="quantidade" id="quantidade" class="form-control" value="<?= htmlspecialchars($_POST['quantidade'] ?? '')?>" required>
+            </div>
 
-        <label for="data">Data:</label>
-        <input type="date" name="data" id="data" value="<?= htmlspecialchars($_POST['data'] ?? '')?>">>
-        <br>
+            <!-- Campo Valor -->
+            <div class="form-group mb-3">
+                <label for="valor" class="form-label">Valor:</label>
+                <input type="text" name="valor" id="valor" class="form-control" value="<?= htmlspecialchars($_POST['valor'] ?? '')?>" required>
+            </div>
 
-        <button type="submit">Adicionar Despesa</button>
-    </form>
+            <!-- Campo Data -->
+            <div class="form-group mb-3">
+                <label for="data" class="form-label">Data:</label>
+                <input type="date" name="data" id="data" class="form-control" value="<?= htmlspecialchars($_POST['data'] ?? '')?>" required>
+            </div>
 
+            <!-- Botão Adicionar Despesa -->
+            <div class="d-grid mb-1">
+                <button type="submit" class="btn btn-primary">Adicionar Despesa</button>
+            </div>
 
+            <!-- Botão Cancelar -->
+             <div class="d-grid">
+                <a href="index.php?acao=dashboard" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Bootstrap JS (caso necessário) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- JS -->
     <script src="../public/js/mascaraValor.js"></script>
-
 </body>
 
 </html>

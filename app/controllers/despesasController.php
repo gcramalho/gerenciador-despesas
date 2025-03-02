@@ -1,6 +1,7 @@
 <?php
 /* PENDENTE 
-    - Implementar mais segurança com Filter_Input nos dados vindo de POST 
+    - Implementar mais segurança (Filter_Input nos dados POST)
+    - Consertar gambiarra do metodo upload
 */
 
 // Dependencias
@@ -9,6 +10,7 @@ require_once '../app/models/despesas.php';
 require_once 'authController.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class DespesasController
@@ -22,74 +24,77 @@ class DespesasController
         $this->authController = new AuthController($bd);
     }
 
-    // Método pegar todas as depesas (models)
+    // Método Pegar Todas As Depesas (models)
     public function getAllDespesas(int $usuarioId): array
     {
-       return $this->despesaModel->getAllDespesas($usuarioId);
+        return $this->despesaModel->getAllDespesas($usuarioId);
     }
 
-    // Método adicionar despesas (models)
+    // Método Adicionar Despesas (models)
     public function addDespesa(): void
     {
-        if($_SERVER['REQUEST_METHOD'] === 'POST')
-        {
-            // dados do form add_despesa.php 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Dados do form add_despesa.php 
             $usuarioId = $_SESSION['usuario_dados']['id']; /* ajustar */
             $quant = $_POST['quantidade'];
             $valor = $_POST['valor'];
             $tipo = $_POST['tipo'];
             $data = $_POST['data'];
 
-            /* error log para verificar como está sendo enviado */
-            error_log("valor recebido: " . $valor); 
+            /* error log para verificar como está sendo enviado 
+            error_log("valor recebido: " . $valor); */
 
             try {
                 $this->despesaModel->addDespesa((int)$usuarioId, (int)$quant, (float)$valor, (string)$tipo, (string)$data);
                 $this->authController->redirecionar('dashboard');
                 //header("Location: index.php?acao=dashboard");
                 //exit();
-            } catch(Exception $e) {
-                echo "Erro ao adicionar despesa: " . $e->getMessage();
+            } catch (Exception $e) {
+                // error_log("Erro ao adicionar despesa: " . $e->getMessage());
+                $_SESSION['erro'] = "Erro ao adicionar despesa: " . $e->getMessage();
+                $this->authController->redirecionar('add_despesa');
             }
-
         } else {
-            // form n submetido
             include '../app/views/add_despesas.php';
         }
     }
 
-
-    // Método editar despesa (models)
+    // Método Editar Despesa (models)
     public function editarDespesa(): void
     {
-        if($_SERVER['REQUEST_METHOD'] === 'POST')
-        {
-            // dados form edição
-            $despesaId =  $_POST['despesa_id']; /* PROVAVELMENTE MUDAR ESSA LÓGICA, ID N DEVE VIR DO FORM */
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Dados form edição
+            $despesaId =  $_POST['despesa_id']; /* input hidden */
 
             $quant = $_POST['quantidade'];
             $valor = $_POST['valor'];
             $tipo = $_POST['tipo'];
             $data = $_POST['data'];
-            
-            // Por algum motivo, é o unico jeito de remover a formatação da mascara JS
+
+            // Por algum motivo, é o único jeito de remover a formatação da máscara JS
             $valor = str_replace(['R$', '', ','], ['', '', '.'], $valor);
 
             try {
-
                 $this->despesaModel->editarDespesa((int)$despesaId, (float)$valor, (int)$quant, (string)$tipo, (string)$data);
                 $this->authController->redirecionar('dashboard');
-
-            } catch(Exception $e){
-                echo "Erro ao editar despesa: " . $e->getMessage();
+            } catch (Exception $e) {
+                // Erro de entrada de dados
+                $_SESSION['erro'] = "Erro ao editar despesa: " . $e->getMessage();
+                $this->authController->redirecionar('editar_despesa&id=' . $despesaId);
             }
-
-        } else { // tentar limpar isto
-            // reexibe pagina de edição
+        } else { // Reexibe página de edição
             $despesaId = $_GET['id'] ?? null;
-            if($despesaId){
-                // dados da despesa p/ edição
+
+            if ($despesaId) {
+                // Dados que serão exibidos p/ edição
                 $despesa = $this->despesaModel->getDespesaId((int)$despesaId);
+
+                // Verifica se o usuário logado tem permissão para editar despesa
+                if ($despesa['usuario_id'] !== $_SESSION['usuario_dados']['id']) {
+                    $_SESSION['erro'] = "Você não tem permissão para editar esta despesa.";
+                    $this->authController->redirecionar('dashboard');
+                    return;
+                }
                 include '../app/views/editar_despesa.php';
             } else {
                 echo "ID da despesa não fornecido.";
@@ -97,10 +102,10 @@ class DespesasController
         }
     }
 
-    // Método excluir despesas
+    // Método Excluir Despesas
     public function excluirDespesas(): void
     {
-        if(!isset($_GET['id'])){
+        if (!isset($_GET['id'])) {
             $_SESSION['erro'] = "ID da despesa não fornecido.";
             $this->authController->redirecionar('dashboard');
             return;
@@ -116,99 +121,167 @@ class DespesasController
         }
 
         $this->authController->redirecionar('dashboard');
-
     }
 
 
-    // Metodo p/ upload
+    // Método p/ Upload
     public function upload(): void
     {
-        if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file']))
-        {
+        // Verifica se o usuário está logado
+        if (!$this->authController->verificarLogin()) {
+            $this->authController->redirecionar('login');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
             $arquivo = $_FILES['file'];
 
             // Verifica se upload foi bem sucedido
-            if($arquivo['error'] !== UPLOAD_ERR_OK){
+            if ($arquivo['error'] !== UPLOAD_ERR_OK) {
                 throw new RuntimeException("Falha de upload, código de erro: " . $arquivo['error']);
             }
 
-            // Valida tipo de arquivo (excel)
+            // Valida tipo de arquivo (Excel)
+            $tiposPermitidos = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'application/octet-stream'
+            ];
             $tipoArquivo = mime_content_type($arquivo['tmp_name']);
 
-            if($tipoArquivo !== 'application/vnd.openxmlformats-officedocument.spreadsheet.sheet' && $tipoArquivo !== 'application/vnd.ms-excel'){
-                throw new RuntimeException("Formato inválido. Por favor, faça upload de um arquivo Excel.");
+            if (!in_array($tipoArquivo, $tiposPermitidos)) {
+                throw new RuntimeException("Formato inválido. Por favor, faça upload de um arquivo Excel (.xlsx ou .xls).");
             }
 
-            // Carrega o arquivo excel
-            $planilha = IOFactory::load($arquivo['tmp_name']);
-            $dadosCedula = $planilha->getActiveSheet()->toArray();
+            try {
+                // Carrega o arquivo excel
+                $planilha = IOFactory::load($arquivo['tmp_name']);
+                $dadosCedula = $planilha->getActiveSheet();
 
-            // Para cada linha do arquivo, insere as despesas
-            foreach($dadosCedula as $cedula){
-                $usuarioId = (int)$cedula[0];
-                $quantidade = (int)$cedula[1];
-                $valor = (float)$cedula[2];
-                $tipo = (string)$cedula[3];
-                $data = (string)$cedula[4];
+                $usuarioId = $_SESSION['usuario_dados']['id'];
 
-                // Add despesa no banco de dados
-                $this->despesaModel->addDespesa($usuarioId, $quantidade, $valor, $tipo, $data);
+                // Itera por cada linha do arquivo
+                foreach ($dadosCedula->getRowIterator() as $linha) {
+
+                    $indiceLinha = $linha->getRowIndex();
+                    
+                    // Ignora primeira linha (cabeçalho)
+                    if ($indiceLinha ===  1) {
+                        continue;
+                    }
+
+                    $valoresLinha = [];
+
+                    // Itera por cada célula da linha
+                    foreach($linha->getCellIterator() as $cedula){
+                        $valorCelula = $cedula->getValue();
+                        
+                        // Ignora células vazias
+                        if($valorCelula === null || trim((string)$valorCelula) === '') {
+                            continue;
+                        }
+                        
+                        $valoresLinha[] = $valorCelula;
+                    }
+
+                    // VER LINHAS DO QUE FOI UPADO
+                    //error_log("Processando linha " . $indiceLinha . ": " . print_r($valoresLinha, true)); 
+
+                    if(empty($valoresLinha)){
+                        continue;
+                    }
+
+                    // Verifica se linha tem 4 colunas 
+                    if (count($valoresLinha) !== 4) {
+                        throw new RuntimeException("Formato inválido na linha " . $indiceLinha . ". O arquivo deve conter exatamente 4 colunas.");
+                    }
+
+                    // Valida dados
+                    $quantidade = filter_var($valoresLinha[0], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                    $valor = filter_var(str_replace(',', '.', (string)$valoresLinha[1]), FILTER_VALIDATE_FLOAT); // formatar separador decimal
+                    $tipo = htmlspecialchars($valoresLinha[2], ENT_QUOTES, 'UTF-8');
+                    $data = DateTime::createFromFormat('Y-m-d', $valoresLinha[3])->format('Y-m-d');
+
+                    // Verifica data
+                    if ($data === false) {
+                        throw new RuntimeException("Data inválida na linha " . $indiceLinha);
+                    }
+
+                    // Verifica se todas as celulas estão preenchidas
+                    if ($quantidade === false || $valor === false || empty($tipo) || empty($data) ) {
+                        throw new RuntimeException("Dados inválidos ou ausentes na linha " . $indiceLinha);
+                    }
+
+                    // Insere despesa no banco de dados
+                    $this->despesaModel->addDespesa($usuarioId, $quantidade, $valor, $tipo, $data);
+                }
+
+                // Redireciona após upload
+                $_SESSION['mensagem'] = "Despesas importadas com sucesso.";
+                $this->authController->redirecionar('dashboard');
+            } catch (RuntimeException $e) {
+                error_log("Erro ao fazer upload: " . $e->getMessage()); // verificar log do erro
+                $_SESSION['erro'] = "Erro ao processar arquivo. Por favor, tente novamente.";
+                $this->authController->redirecionar('upload');
             }
-
-            // Redireciona após upload
-            header("Location: /public/index.php?action=despesas");
-            exit();
-
-
-            // se for GET exibe página de upload
         } else {
-            include 'app/views/upload.php';
+            include '../app/views/upload.php';
         }
-
     }
 
 
-    // Metodo p/ download
+    // Método p/ Download
     public function download(): void
     {
-        $usuarioId = $_SESSION['usuario_id'];
-        // busca as despesas do usuario
-        $despesas = $this->despesaModel->getAllDespesas($usuarioId);
-
-        $planilha = new Spreadsheet();
-        $cedula = $planilha->getActiveSheet();
-
-        // Cabeçalho da planilha
-        $cedula->setCellValue('A1', 'ID Usuario');
-        $cedula->setCellValue('B1', 'Quantidade');
-        $cedula->setCellValue('C1', 'Valor');
-        $cedula->setCellValue('D1', 'Tipo');
-        $cedula->setCellValue('E1', 'Data');
-
-
-        // Linhas
-        $linha = 2;
-        foreach($despesas as $despesa){
-            $cedula->setCellValue('A' . $linha, (int)$despesa['usuario_id']);
-            $cedula->setCellValue('B' . $linha, (int)$despesa['quant']);
-            $cedula->setCellValue('C' . $linha, (string)$despesa['tipo']);
-            $cedula->setCellValue('D' . $linha, (string)$despesa['data']);
-            $cedula->setCellValue('E' . $linha, (float)$despesa['valor']);
-            $linha++;
+        // Verifica se o usuário está logado
+        if (!$this->authController->verificarLogin()) {
+            $this->authController->redirecionar('login');
+            return;
         }
 
+        $usuarioId = $_SESSION['usuario_dados']['id'];
 
-        // Cabeçalho para forçar donwlaod
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="expenses.xlsx"');
-        header('Cache-Control: max-age=0');
+        try {
+            // Busca as despesas do usuario
+            $despesas = $this->despesaModel->getAllDespesas($usuarioId);
 
-        $writer = IOFactory::createWriter($planilha, 'xlsx');
-        $writer->save('php://output');
-        exit();
+            if (empty($despesas)) {
+                throw new RuntimeException("Nenhuma despesa encontrada.");
+            }
+
+            // Cria planilha
+            $planilha = new Spreadsheet();
+            $cedula = $planilha->getActiveSheet();
+
+            // Define cabeçalho da planilha
+            $cedula->setCellValue('A1', 'Quantidade');
+            $cedula->setCellValue('B1', 'Valor');
+            $cedula->setCellValue('C1', 'Tipo');
+            $cedula->setCellValue('D1', 'Data');
+
+            // Preenche linhas com os dados
+            $linha = 2;
+            foreach ($despesas as $despesa) {
+                $cedula->setCellValue('A' . $linha, (int)$despesa['quant']);
+                $cedula->setCellValue('B' . $linha, (float)$despesa['valor']);
+                $cedula->setCellValue('C' . $linha, (string)$despesa['tipo']);
+                $cedula->setCellValue('D' . $linha, (string)$despesa['data']);
+                $linha++;
+            }
+
+            // Configura cabeçalho para forçar downlaod
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="despesas.xlsx"');
+            header('Cache-Control: max-age=0');
+
+            $writer = new Xlsx($planilha);
+            $writer->save('php://output');
+            exit();
+        } catch (RuntimeException $e) {
+            error_log("Erro ao fazer download: " . $e->getMessage()); // verificar log do erro
+
+            $_SESSION['erro'] = "Erro ao gerar arquivo de download. Por favor, tente novamente.";
+            $this->authController->redirecionar('despesas');
+        };
     }
-
-
 }
-
-?>

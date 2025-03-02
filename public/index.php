@@ -1,9 +1,4 @@
 <?php
-/*    PENDENTE: 
-    - Arrumar modal js de exlusão
-    - Boostrap views
-*/
-
 declare(strict_types=1);
 
 // Sessão
@@ -107,12 +102,22 @@ switch ($acao) {
         break;
 
     case 'upload':
-        // função upload
+        // Verifica se está logado
+        if(!$authController->verificarLogin()){
+            $authController->redirecionar('login');   
+        }
+
+        // Chama função
         $despesasController->upload();
         break;
 
     case 'download':
-        // função download
+        // Verifica se está logado
+        if(!$authController->verificarLogin()){
+            $authController->redirecionar('login');   
+        }
+
+        // Chama função
         $despesasController->download();
         break;
 

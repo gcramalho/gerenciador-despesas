@@ -46,12 +46,14 @@ class Despesa
             $stmt->bindParam(':data', $data, PDO::PARAM_STR);
             $stmt->bindParam(':valor', $valor, PDO::PARAM_STR);
 
-            // Executa 
+            // Executa query
             $resultado = $stmt->execute();
+
+            // Confirma transação
             $this->conn->commit();
             return $resultado;
 
-        } catch (PDOException $e) { // Ou, se houver erros
+        } catch (PDOException $e) { // Desfaz se houver erro
             $this->conn->rollBack();
             error_log("Erro ao adicionar despesa: " . $e->getMessage());
             throw new Exception("Falha ao adicionar despesa");
@@ -129,8 +131,9 @@ class Despesa
             $stmt->bindParam(':despesaId', $despesaId);
             // Executa atualização
             return $stmt->execute();
-        } catch(PDOException $e) {
-            // Em caso de erro
+
+        } catch(PDOException $e) {  // Em caso de erro
+            
             error_log("Erro ao editar despesas: " . $e->getMessage());
             throw new Exception("Falha ao editar despesas.");
         }

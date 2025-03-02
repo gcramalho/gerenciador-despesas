@@ -53,7 +53,7 @@ class AuthController{
             }
         }
 
-        include '../app/views/registro.php';   /* PENDENTE - criar esta view */
+        include '../app/views/registro.php';
     }
 
     public function processarLogin(): void
@@ -95,7 +95,7 @@ class AuthController{
 
     public function logout(): void
     {
-        session_start();
+        session_start(); //
         session_destroy();
         $this->redirecionar('login');
     }
