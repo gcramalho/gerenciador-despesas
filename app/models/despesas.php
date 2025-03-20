@@ -61,36 +61,67 @@ class Despesa
     }
 
     
-    
 
     /** * -------- MÉTODO OBTER DESPESAS ----------- *
+     * Obtem despesas com páginação
      * @param int $usuarioId O ID do usuário cujas despesas devem ser recuperadas. 
      * @return array Lista de despesas. 
      * @throws Exception Se ocorrer um erro ao buscar as despesas. 
      */
-    public function getAllDespesas(int $usuarioId): array
+    public function getAllDespesas(int $usuarioId, int $itensPorPagina = 10, int $paginaAtual = 1): array
     {
-        // Seleciona todas as despesas do usuario especifico 
-        $query = "SELECT * FROM " . $this->tabela_nome . " WHERE usuario_id = :usuario_id";
+        // offset, intervalo de linhas da consulta
+        $offset = ($paginaAtual - 1) * $itensPorPagina;
+
+        // 0btem todas as despesas do usuário (consulta paginada)
+        $query = "SELECT * FROM " . $this->tabela_nome . " WHERE usuario_id = :usuario_id LIMIT :limit OFFSET :offset";
+
+        // Total de despesas
+        $queryContagem = "SELECT COUNT(*) as total FROM " . $this->tabela_nome . " WHERE usuario_id = :usuario_id";
+
+        // Total valores
+        $queryTotais = "SELECT SUM(valor * quant) as totalDespesas, SUM(quant) as totalItens FROM " . $this->tabela_nome . " WHERE usuario_id = :usuario_id";
 
         
         try {
-            // Prepara, vincula parametros
+            // Prepara, vincula parametros (despesas)
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(':usuario_id', $usuarioId);
-
-            // Executa consulta
+            $stmt->bindParam(':limit', $itensPorPagina, PDO::PARAM_INT);
+            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+            // Executa e guarda consulta
             $stmt->execute();
+            $despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Retorna as despesas
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Prepara, vincula parametros (contagem registros paginação)
+            $stmtCount = $this->conn->prepare($queryContagem);
+            $stmtCount->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
+            $stmtCount->execute();
+            $totalDespesas = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
+
+            // Total de páginas
+            $totalPaginas = ceil($totalDespesas / $itensPorPagina);
+
+            // Prepara, vincula (total valores despesas)
+            $stmtSum = $this->conn->prepare($queryTotais);
+            $stmtSum->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
+            $stmtSum->execute();
+            $totais = $stmtSum->fetch(PDO::FETCH_ASSOC);
+
+            // Retorna resultados
+            return [
+                'despesas' => $despesas,
+                'totalDespesas' => $totais['totalDespesas'] ?? 0, 
+                'totalValor' => $totais['totalItens'] ?? 0, 
+                'totalPaginas' => $totalPaginas,
+                'paginaAtual' => $paginaAtual
+            ];
+
         } catch (PDOException $e) {
             error_log("Erro ao buscar despesas: " . $e->getMessage());
             throw new Exception("Falha ao buscar despesas");
         }
     }
-
-
 
 
     /** * -------- MÉTODO EDITAR DESPESA -------- * 

@@ -27,7 +27,11 @@ class DespesasController
     // Método Pegar Todas As Depesas (models)
     public function getAllDespesas(int $usuarioId): array
     {
-        return $this->despesaModel->getAllDespesas($usuarioId);
+        // Número da página da URL
+        $paginaAtual = $_GET['pagina'] ?? 1;
+        $itensPorPagina = 10; 
+
+        return $this->despesaModel->getAllDespesas($usuarioId, $itensPorPagina, (int)$paginaAtual);
     }
 
     // Método Adicionar Despesas (models)

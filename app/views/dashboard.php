@@ -1,17 +1,7 @@
 <?php
-// Calculo total de despesas e itens
-$totalDespesas = 0;
-$totalItens = 0;
-
-if(!empty($despesas)) {
-    foreach ($despesas as $despesa) {
-        // Soma valores das despesas
-        $totalDespesas += ($despesa['valor'] * $despesa['quant']);
-        // Soma quantidade de itens
-        $totalItens += $despesa['quant'];
-    };
-}
-
+// Valor total de despesas e itens
+$totalDespesas = $despesas['totalDespesas'] ?? 0;
+$totalItens = $despesas['totalValor'] ?? 0;
 ?>
 
 <!DOCTYPE html>
@@ -87,12 +77,14 @@ if(!empty($despesas)) {
             </div>
 
 
-            <!-- Conteúdo principal -->
+            <!-- CONTEÚDO PRINCIPAL -->
+             
             <div class="col-md-12">
                 <!-- Exibe mensagem de sucesso, se houver -->
                 <?php if (isset($_SESSION['mensagem'])): ?>
                     <div class="alert alert-sucess">
                         <?= htmlspecialchars($_SESSION['mensagem']) ?>
+                        <?php unset($_SESSION['mensagem']); ?>
                     </div>
                 <?php endif; ?>
 
@@ -120,7 +112,7 @@ if(!empty($despesas)) {
                             </thead>
                             <tbody>
                                 <!-- Se não houver despesas registradas -->
-                                <?php if (empty($despesas)): ?>
+                                <?php if (empty($despesas['despesas'])): ?>
                                     <tr>
                                         <td colspan="6" class="text-center">
                                             <i class="fas fa-receipt"></i>
@@ -130,7 +122,7 @@ if(!empty($despesas)) {
 
                                 <?php else: ?>
                                     <!-- Lista de despesas registradas -->
-                                    <?php foreach ($despesas as $despesa): ?>
+                                    <?php foreach ($despesas['despesas'] as $despesa): ?>
                                         <tr>
                                             <!-- Data -->
                                             <td><?= date('d/m/Y', strtotime($despesa['data'])) ?></td>
@@ -159,6 +151,36 @@ if(!empty($despesas)) {
                                 <?php endif; ?>
                             </tbody>
                         </table>
+
+                        <!-- Links Paginação -->
+                         <nav aria-label="Paginação">
+                            <ul class="pagination justify-content-center">
+
+                            <?php if($despesas['paginaAtual'] > 1) : ?>
+                                <li class="page-item">
+                                    <a href="?acao=dashboard&pagina=<?=$despesas['paginaAtual'] - 1?>" class="page-link" aria-label="Anterior">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+
+                            <?php for($i = 1; $i <= $despesas['totalPaginas']; $i++) : ?>
+                                <li class="page-item <?= $i == $despesas['paginaAtual'] ? 'active' : '' ?>">
+                                    <a class="page-link" href="?acao=dashboard&pagina=<?=$i?>">
+                                        <?= $i ?>
+                                    </a>
+                                </li>
+                            <?php endfor; ?>
+
+                            <?php if($despesas['paginaAtual'] < $despesas['totalPaginas']) : ?>
+                                <li>
+                                    <a href="?acao=dashboard&pagina=<?=$despesas['paginaAtual'] + 1?>" class="page-link" aria-label="Próxima">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            </ul>
+                         </nav>
                     </div>
                 </div>
             </div>

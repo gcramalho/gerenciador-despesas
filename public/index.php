@@ -72,12 +72,16 @@ switch ($acao) {
         // Verifica se está logado
         if(!$authController->verificarLogin()){
             $authController->redirecionar('login');   
-            
         }
 
-        // Usuário logado, lógica do dashboard
+        // Usuário logado, lógica dashboard/paginação
         try {
-            $despesas = $despesasController->getAllDespesas((int)$_SESSION['usuario_dados']['id']);
+            // obtém o número da página da URL
+            $paginaAtual = $_GET['pagina'] ?? 1;
+
+            // chama o método e passa o id do usuário logado e a página atual
+            $despesas = $despesasController->getAllDespesas((int)$_SESSION['usuario_dados']['id'], 10, $paginaAtual);
+
             include '../app/views/dashboard.php';
         } catch (Exception $e) {
             error_log($e->getMessage());
